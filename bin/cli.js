@@ -39,7 +39,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`no-yolo-commits — an AI pre-commit reviewer + "no direct commits to main" guard
+  console.log(`no-yolo-commits — an AI pre-commit reviewer + "no direct commits or pushes to main" guard
 
 Usage:
   npx no-yolo-commits init [options]          per-project install (via husky)
@@ -57,7 +57,7 @@ Options:
                       reviewer, e.g. --stack="Next.js + TypeScript + Postgres"
                       (default: "TypeScript")
   --protect=a,b,c     Comma-separated branch names that block direct commits
-                      (default: "main,master")
+                      *and* pushes (default: "main,master")
   --model=NAME        Pass --model NAME through to every \`claude\` invocation
                       (cost/speed control — e.g. --model=haiku)
   --global, -g        Install into git's global hook template
@@ -108,6 +108,11 @@ function buildHookScript(args, defaultPrefixSource) {
   return { hookScript, prefix, protectedBranches };
 }
 
+function buildPrePushScript(protectedBranches) {
+  const templatePath = path.join(__dirname, '..', 'templates', 'pre-push.sh');
+  return fs.readFileSync(templatePath, 'utf8').replace(/__PROTECTED__/g, protectedBranches);
+}
+
 function run(cmd, cmdArgs) {
   console.log(`  $ ${cmd} ${cmdArgs.join(' ')}`);
   const result = spawnSync(cmd, cmdArgs, { cwd: CWD, stdio: 'inherit' });
@@ -128,9 +133,11 @@ function initProject(args) {
 
   const huskyDir = path.join(CWD, '.husky');
   const hookPath = path.join(huskyDir, 'pre-commit');
+  const pushHookPath = path.join(huskyDir, 'pre-push');
 
-  if (fs.existsSync(hookPath) && !args.force) {
-    fail(`${hookPath} already exists — pass --force to overwrite it.`);
+  if (!args.force) {
+    if (fs.existsSync(hookPath)) fail(`${hookPath} already exists — pass --force to overwrite it.`);
+    if (fs.existsSync(pushHookPath)) fail(`${pushHookPath} already exists — pass --force to overwrite it.`);
   }
 
   const hasHusky = (pkg.devDependencies && pkg.devDependencies.husky) || (pkg.dependencies && pkg.dependencies.husky);
@@ -153,12 +160,16 @@ function initProject(args) {
   run('npx', ['husky']);
 
   const { hookScript, prefix, protectedBranches } = buildHookScript(args, freshPkg.name);
+  const pushHookScript = buildPrePushScript(protectedBranches);
 
   fs.mkdirSync(huskyDir, { recursive: true });
   fs.writeFileSync(hookPath, hookScript);
   fs.chmodSync(hookPath, 0o755);
+  fs.writeFileSync(pushHookPath, pushHookScript);
+  fs.chmodSync(pushHookPath, 0o755);
 
   console.log(`✓ wrote ${path.relative(CWD, hookPath)}`);
+  console.log(`✓ wrote ${path.relative(CWD, pushHookPath)}`);
   printSummary(prefix, protectedBranches);
 }
 
@@ -171,17 +182,23 @@ function initGlobal(args) {
 
   const hooksDir = path.join(templateDir, 'hooks');
   const hookPath = path.join(hooksDir, 'pre-commit');
+  const pushHookPath = path.join(hooksDir, 'pre-push');
 
-  if (fs.existsSync(hookPath) && !args.force) {
-    fail(`${hookPath} already exists — pass --force to overwrite it.`);
+  if (!args.force) {
+    if (fs.existsSync(hookPath)) fail(`${hookPath} already exists — pass --force to overwrite it.`);
+    if (fs.existsSync(pushHookPath)) fail(`${pushHookPath} already exists — pass --force to overwrite it.`);
   }
 
   const { hookScript, prefix, protectedBranches } = buildHookScript(args, null);
+  const pushHookScript = buildPrePushScript(protectedBranches);
 
   fs.mkdirSync(hooksDir, { recursive: true });
   fs.writeFileSync(hookPath, hookScript);
   fs.chmodSync(hookPath, 0o755);
+  fs.writeFileSync(pushHookPath, pushHookScript);
+  fs.chmodSync(pushHookPath, 0o755);
   console.log(`✓ wrote ${hookPath}`);
+  console.log(`✓ wrote ${pushHookPath}`);
 
   run('git', ['config', '--global', 'init.templateDir', templateDir]);
 
@@ -201,7 +218,12 @@ function printSummary(prefix, protectedBranches) {
   console.log('  - AI review of staged changes (needs `claude` on PATH) — blocks only on high-confidence issues');
   console.log(`  - direct commits to [${protectedBranches}] auto-branch instead, as ${prefix}-<timestamp>-<slug>`);
   console.log('');
+  console.log('And on `git push`:');
+  console.log(`  - pushing to [${protectedBranches}] is refused outright — merged, rebased, whatever got`);
+  console.log('    a commit there locally doesn\'t matter, only where the push is headed');
+  console.log('');
   console.log('Bypass for one commit: git commit --no-verify');
+  console.log('Bypass for one push:   git push --no-verify');
 }
 
 function init(args) {
