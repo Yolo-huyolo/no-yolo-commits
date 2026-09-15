@@ -17,6 +17,10 @@ One command. On every commit from now on:
 2. **An AI actually reads your diff** (via the [`claude`](https://claude.com/claude-code) CLI) and blocks the commit — but only for real, high-confidence problems. Not vibes, not "you could refactor this." If the reviewer is missing, slow, or having a bad day, it fails **open** — a flaky reviewer should never be the reason your commit is stuck. Skipped automatically when everything staged is a lockfile or generated asset, so bumping `package-lock.json` doesn't cost you a 2-minute wait.
 3. **`main`/`master` become look-but-don't-touch.** Commit straight there and instead of yelling at you, it just makes you a branch — `ACME-1788716508-fix-the-thing-you-were-actually-fixing`, ready to go, commit already on it. It even wrote the branch name from your diff.
 
+And on every `git push`:
+
+4. **Pushing to `main`/`master` is refused, full stop** — independent of #3 above. The auto-branch step only stops a *direct commit* from landing on a protected branch; nothing stops you from merging that branch back locally and pushing anyway a minute later, which lands you in exactly the state #3 was trying to prevent. This hook checks the actual destination of the push itself — merged, rebased, cherry-picked, doesn't matter, only where it's headed — so protection doesn't quietly evaporate the moment you (or an agent working on your behalf) does the merge-and-push in one motion without a real pause in between.
+
 No dashboard. No config file to argue with. No runtime dependencies — it's shell scripts wearing a [husky](https://typicode.github.io/husky/) trenchcoat.
 
 ## Install
@@ -29,7 +33,7 @@ That's the whole install, per project. It will, in order:
 
 - add `husky` as a devDependency (if you don't have it)
 - set `"scripts.prepare": "husky"` in `package.json`
-- drop `.husky/pre-commit` into your repo
+- drop `.husky/pre-commit` and `.husky/pre-push` into your repo
 
 ### Or install it once, everywhere
 
@@ -89,7 +93,8 @@ Same secret scan, same AI review, run against the PR's diff against its base bra
 This is a guardrail, not a cage. Bad day, emergency hotfix, you know exactly what you're doing:
 
 ```bash
-git commit --no-verify
+git commit --no-verify   # skip the secret scan / AI review / auto-branch for one commit
+git push --no-verify     # skip the protected-branch push check for one push
 ```
 
 No questions asked. No shame either — that's what it's there for.

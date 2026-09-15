@@ -1,7 +1,7 @@
 {
   "name": "no-yolo-commits",
-  "version": "1.2.1",
-  "description": "AI pre-commit review (via the claude CLI) + a guard that auto-branches you off main/master instead of letting a direct commit land there.",
+  "version": "1.3.0",
+  "description": "AI pre-commit review (via the claude CLI) + a guard that auto-branches you off main/master instead of letting a direct commit land there, and a pre-push hook that refuses any push to main/master outright regardless of how it got there locally.",
   "keywords": [
     "husky",
     "git-hooks",
