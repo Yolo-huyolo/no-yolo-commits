@@ -11,10 +11,10 @@ if ! git diff --cached --quiet 2>/dev/null; then
     -e '-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----' \
     -e 'AKIA[0-9A-Z]{16}' \
     -e 'xox[baprs]-[0-9A-Za-z-]{10,}' \
-    -e '(api[_-]?key|secret|access[_-]?token|password|passwd)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_/+=-]{16,}["'"'"']' \
+    -e '(api[_-]?key|secret|token|password|passwd)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_/+=:-]{16,}["'"'"']' \
     2>/dev/null || true)"
 
-  env_files="$(git diff --cached --name-only -- . 2>/dev/null | grep -E '(^|/)\.env(\.[^.]+)?$' | grep -v -E '\.(example|sample|template|dist)$' || true)"
+  env_files="$(git diff --cached --name-only -- . 2>/dev/null | grep -E '(^|/)\.env(\.[^.]+)?$|(^|/)[A-Za-z0-9_-]+\.env(\.[^.]+)?$' | grep -v -E '\.(example|sample|template|dist)$' || true)"
 
   if [ -n "$secret_hits" ] || [ -n "$env_files" ]; then
     echo ""
